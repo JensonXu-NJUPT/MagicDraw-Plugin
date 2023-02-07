@@ -23,11 +23,6 @@ import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.util.*;
 
-/**
- * Example-Plugin for counting model elements and doing some kind of analysis or statistics.
- * Demonstrates how to collect children (contained elements) of some element,
- * how to go through hierarchy and do some element-type specific actions by using InheritanceVisitor.
- */
 @SuppressWarnings({"squid:S106", "squid:S1148", "UnusedDeclaration"})
 public class MyPlugin3 extends Plugin
 {
