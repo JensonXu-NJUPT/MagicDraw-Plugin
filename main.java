@@ -1,4 +1,4 @@
-package myplugin3;
+package myplugin5;
 
 import com.nomagic.actions.AMConfigurator;
 import com.nomagic.actions.ActionsManager;
@@ -9,22 +9,37 @@ import com.nomagic.magicdraw.plugins.Plugin;
 import com.nomagic.magicdraw.ui.browser.Node;
 import com.nomagic.magicdraw.ui.browser.Tree;
 import com.nomagic.magicdraw.ui.browser.actions.DefaultBrowserAction;
-import com.nomagic.magicdraw.uml.BaseElement;
 import com.nomagic.magicdraw.uml.ClassTypes;
-import com.nomagic.uml2.ext.jmi.reflect.VisitorContext;
-import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.Comment;
 import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.Element;
-import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.ElementTaggedValue;
+import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.LiteralUnlimitedNatural;
+import com.nomagic.uml2.ext.magicdraw.commonbehaviors.mdcommunications.Trigger;
+import com.nomagic.uml2.ext.magicdraw.commonbehaviors.mdsimpletime.TimeExpression;
 import com.nomagic.uml2.impl.ModelHierarchyVisitor;
-import com.nomagic.uml2.ext.magicdraw.activities.mdintermediateactivities.ActivityPartition;
+
+import com.nomagic.uml2.ext.magicdraw.activities.mdbasicactivities.ControlFlow;
+import com.nomagic.uml2.ext.magicdraw.activities.mdfundamentalactivities.ActivityNode;
+import com.nomagic.uml2.ext.magicdraw.actions.mdbasicactions.OpaqueAction;
+import com.nomagic.uml2.ext.magicdraw.commonbehaviors.mdcommunications.TimeEvent;
+import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.LiteralString;
 
 import javax.annotation.CheckForNull;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
+import java.io.ByteArrayOutputStream;
 import java.util.*;
+import java.io.*;
 
+import org.apache.commons.lang.StringUtils;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.io.OutputFormat;
+import org.dom4j.io.XMLWriter;
+
+/**
+ * Generate XML plugin
+ */
 @SuppressWarnings({"squid:S106", "squid:S1148", "UnusedDeclaration"})
-public class MyPlugin3 extends Plugin
+public class MyPlugin5 extends Plugin
 {
     /**
      * Action, that do all the work.
@@ -35,7 +50,13 @@ public class MyPlugin3 extends Plugin
      * Hierarchy visitor, for counting elements.
      * Can do different actions with different element types.
      */
-    private final StatisticsVisitor visitor = new StatisticsVisitor();
+    private final ModelHierarchyVisitor visitor = new ModelHierarchyVisitor();
+
+    /**
+     * Build a document object to operate XML
+     */
+    Document document = DocumentHelper.createDocument();
+    String XMLFileName = "XML4MagicDraw";  //XML file name
 
     /**
      * Initializing the plugin.
@@ -96,7 +117,7 @@ public class MyPlugin3 extends Plugin
     {
         public ShowStatistics()
         {
-            super("", "Show Statistics", null, null);
+            super("", "Generate XML", null, null);
         }
 
         /**
@@ -106,7 +127,6 @@ public class MyPlugin3 extends Plugin
         @Override
         public void actionPerformed(ActionEvent evt)
         {
-            visitor.getMap().clear();
             // count children of selected in browser element.
             Tree tree = getTree();
             if (tree != null)
@@ -116,52 +136,36 @@ public class MyPlugin3 extends Plugin
                 {
                     visitChildren(element);
                 }
-                showResults(visitor.getMap());
+                JOptionPane.showMessageDialog(null, "Success!", "XML Generation", JOptionPane.PLAIN_MESSAGE);
             }
-        }
 
-        /**
-         * Displays counting results - data from counter's elements map.
-         * Simply shows Swing message with counting results.
-         */
-        public void showResults(Map<String, Integer> map)
-        {
-            // this text will be displayed in message window.
-            StringBuilder text = new StringBuilder();
+            // Format
+            OutputFormat format = OutputFormat.createPrettyPrint();
+            format.setEncoding("UTF-8");
 
-            // constructs text in style :
-            // Type1 : elements number
-            // Type2 : elements number
-            // ...
-            for (String type : map.keySet())
+            /*
+             * Generate XML file
+             * The file is located in the root path of the project
+             */
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try
             {
-                text.append(type).append(" : ").append(map.get(type)).append("\n");
+                XMLWriter writer = new XMLWriter(out, format);
+                writer.write(document);
+                writer.close();
             }
-
-            // do some analysis - average number of attributes and operation per class.
-            Integer classes = map.get("ModelClass");
-            Integer attributes = map.get("Attribute");
-            Integer operations = map.get("Operation");
-
-            if (classes != null && operations != null)
+            catch (IOException e)
             {
-                text.append("Average operations per class : ").append(operations.doubleValue() / classes.doubleValue()).append("\n");
+                System.out.println("File generation failed! File name: " + XMLFileName);
             }
-
-            if (classes != null && attributes != null)
+            try (FileOutputStream fos = new FileOutputStream(XMLFileName + ".xml"))
             {
-                text.append("Average attributes per class : ").append(attributes.doubleValue() / classes.doubleValue()).append("\n");
+                fos.write(out.toByteArray());
             }
-
-            // if map was empty and no elements was found.
-            if (text.length() == 0)
+            catch (IOException e)
             {
-                text = new StringBuilder("No elements found!");
-
+                e.printStackTrace();
             }
-
-            // displays constructed text.
-            JOptionPane.showMessageDialog(null, text.toString(), "Statistics", JOptionPane.PLAIN_MESSAGE);
         }
 
         /**
@@ -204,13 +208,21 @@ public class MyPlugin3 extends Plugin
          * Goes through all children of given model elements.
          * Demonstrates way how to collect all children by using FOR cycle and avoiding recursion.
          * Visit every child with StatisticsVisitor.
-         *
          * @param root the root model element.
          */
         public void visitChildren(Element root)
         {
             ArrayList<Element> all = new ArrayList<>();
             all.add(root);
+
+            // Get the root model element information
+            String rootID = root.getID();
+            String rootClassType = ClassTypes.getShortName(root.getClassType());
+            String rootHumanName = root.getHumanName();
+            // Write into XML file
+            document.clearContent();
+            org.dom4j.Element rootItem = document.addElement(rootClassType).addAttribute("id", rootID)
+                                                                           .addAttribute("humanname", rootHumanName);
 
             // if current element has children, list will be increased.
             for (int i = 0; i < all.size(); i++)
@@ -220,127 +232,199 @@ public class MyPlugin3 extends Plugin
                 {
                     // let's perform some action with this element in visitor.
                     current.accept(visitor);
-
                 }
                 catch (Exception e)
                 {
                     e.printStackTrace();
                 }
                 // add all children into end of this list, so it emulates recursion.
-                all.addAll(current.getOwnedElement());
+                Collection<Element> childrenElement = current.getOwnedElement();
+                all.addAll(childrenElement);
+
+                for(Element childElement: childrenElement)
+                {
+                    // Get the  childElement's parent element information
+                    String childParentID = childElement.getObjectParent().getID();
+                    String childParentClassType = ClassTypes.getShortName(childElement.getObjectParent().getClassType());
+
+                    // if childElement's parent element is the root
+                    if(Objects.equals(childParentID, rootID))
+                    {
+                        // Get the child model element information
+                        String childID = childElement.getID();
+                        String childClassType = ClassTypes.getShortName(childElement.getClassType());
+                        String childHumanName = childElement.getHumanName();
+                        // Write into XML file
+                        org.dom4j.Element childItem = rootItem.addElement(childClassType).addAttribute("id", childID)
+                                                                                         .addAttribute("humanname", childHumanName);
+                    }
+                    else
+                    {
+                        // Get all the context under the root Node
+                        String select1 = "/" + rootClassType;
+                        String select2 = "//" + childParentClassType + "[@id=" + "'" + childParentID + "'" + "]";
+
+                        org.dom4j.Node rootNode = document.selectSingleNode(select1);
+                        List<org.dom4j.Node> childParent = rootNode.selectNodes(select2);
+                        org.dom4j.Element childParentItem = (org.dom4j.Element) childParent.get(0);
+
+                        String childClassType = ClassTypes.getShortName(childElement.getClassType());
+                        switch(childClassType)
+                        {
+                            case "ControlFlow":
+                                ControlFlow elementControlFlow = (ControlFlow)childElement;
+                                writeControlFlow2XML(childParentItem, elementControlFlow);
+                                break;
+
+                            case "OpaqueAction":
+                                OpaqueAction elementOpaqueAction = (OpaqueAction)childElement;
+                                writeOpaqueAction2XML(childParentItem, elementOpaqueAction);
+                                break;
+
+                            case "LiteralUnlimitedNatural":
+                                LiteralUnlimitedNatural elementLiteralUnlimitedNatural = (LiteralUnlimitedNatural)childElement;
+                                writeLiteralUnlimitedNatural2XML(childParentItem, elementLiteralUnlimitedNatural);
+                                break;
+
+                            case "Trigger":
+                                Trigger elementTrigger = (Trigger)childElement;
+                                writeTrigger2XML(childParentItem, elementTrigger);
+                                break;
+
+                            default:
+                                writeElement2XML(childParentItem, childElement);
+                        }
+                    }
+                }
             }
         }
-    }
 
-    /**
-     * Visitor for counting model elements.
-     * Contains Map for counting results.
-     * Must be overridden visit... method for every counted type of element.
-     * In this example only ModelClass, Attribute and Operation will be counted.
-     */
-    static class StatisticsVisitor extends ModelHierarchyVisitor
-    {
-        /**
-         * Map for counting results.
-         * Class type is a key, number is a value.
+        /*
+         * For different types of elements,
+         * add the unique attributes to the XML statement
          */
-        private final HashMap<String, Integer> statsTable = new HashMap<>();
-
-        /**
-         * Returns map of results. Used to access results from outside.
-         *
-         * @return results map.
-         */
-        public Map<String, Integer> getMap()
+        public void writeElement2XML(org.dom4j.Element root, Element element)
         {
-            return statsTable;
+            // Get the child model element information
+            String elementID = element.getID();
+            String elementClassType = ClassTypes.getShortName(element.getClassType());
+            String elementHumanName = element.getHumanName();
+
+            // Write into XML file
+            org.dom4j.Element item = root.addElement(elementClassType).addAttribute("id", elementID)
+                                                                      .addAttribute("humanname", elementHumanName);
         }
 
-        @Override
-        public void visitElement(com.nomagic.uml2.ext.magicdraw.classes.mdkernel.Element element,
-                                 VisitorContext context)
+        // ControlFlow
+        public void writeControlFlow2XML(org.dom4j.Element root, ControlFlow element)
         {
-            super.visitElement(element, context);
-            count(element);
-            printInfParent(element);
-            System.out.println();
-        }
+            // ControlFlow element has source and target, get them
+            ActivityNode source = element.getSource();
+            ActivityNode target = element.getTarget();
 
-        /**
-         * Increases value of this type count in results map.
-         * If there is no such registered type, add it.
-         * @param element the element to count.
-         */
-        public void count(Element element)
-        {
-            String classType = ClassTypes.getShortName(element.getClassType());
-            Integer count = statsTable.get(classType);
-            if (count==null)
+            // Get all the  element information
+            String elementID = element.getID();
+            String elementClassType = ClassTypes.getShortName(element.getClassType());
+            String elementHumanName = element.getHumanName();
+            String sourceID = null;
+            String targetID = null;
+            if (source != null)
             {
-                count = 0;
+                sourceID = source.getID();
+            }
+            if (target != null)
+            {
+                targetID = target.getID();
             }
 
-            statsTable.put(classType, count + 1);
+            // Write into XML file
+            org.dom4j.Element item = root.addElement(elementClassType).addAttribute("id", elementID)
+                                                                      .addAttribute("humanname", elementHumanName)
+                                                                      .addAttribute("source", sourceID)
+                                                                      .addAttribute("target", targetID);
         }
 
-        // Print element information
-        public void printInf(Element element)
-        {
-            String classType = ClassTypes.getShortName(element.getClassType());  // The type of element
-            String classID = element.getID();  // The ID of element
-            String humanName = element.getHumanName();  // The human name of element
-            String humanType = element.getHumanType();  // The human type of element
 
-            // Print in the console
-            System.out.println("Element ID: " + classID);
-            System.out.println("Class Type: " + classType);
-            System.out.println("Human Name: " + humanName);
-            System.out.println("Human Type: " + humanType);
-        }
-
-        // Print the owner element information
-        public void printInfOwner(Element element)
+        // OpaqueAction
+        public void writeOpaqueAction2XML(org.dom4j.Element root, OpaqueAction element)
         {
-            Element owner = element.getOwner();
-            String ownerID = null;
-            String ownerClassType = null;
-            if (owner != null)
+            // Get all the  element information
+            List<String> body, language;
+            String elementBody = null;
+            String elementLanguage = null;
+            String elementID = element.getID();
+            String elementClassType = ClassTypes.getShortName(element.getClassType());
+            String elementHumanName = element.getHumanName();
+
+            // OpaqueAction element has body and language, get them
+            boolean hasBody = element.hasBody();
+            boolean hasLanguage = element.hasLanguage();
+            if(hasBody)
             {
-                ownerID = owner.getID();
-                ownerClassType = ClassTypes.getShortName(owner.getClassType());
+                body = element.getBody();
+                elementBody = StringUtils.join(body, ";");
             }
-            System.out.println("Owner ID: " + ownerID);
-            System.out.println("Owner Class Type: " + ownerClassType);
+            if(hasLanguage)
+            {
+                language = element.getLanguage();
+                elementLanguage = StringUtils.join(language, ";");
+            }
+
+            // Write into XML file
+            org.dom4j.Element item = root.addElement(elementClassType).addAttribute("id", elementID)
+                                                                      .addAttribute("humanname", elementHumanName)
+                                                                      .addAttribute("body", elementBody)
+                                                                      .addAttribute("language", elementLanguage);
         }
 
-        // Print the sync element information
-        public void printInfSync(Element element)
+        // LiteralUnlimitedNatural
+        public void writeLiteralUnlimitedNatural2XML(org.dom4j.Element root, LiteralUnlimitedNatural element)
         {
-            Element sync = element.getSyncElement();
-            String syncID = null;
-            String syncClassType = null;
-            if (sync != null)
-            {
-                syncID = sync.getID();
-            }
-            if (sync != null)
-            {
-                syncClassType = ClassTypes.getShortName(sync.getClassType());
-            }
-            System.out.println("Sync ID: " + syncID);
-            System.out.println("Sync Class Type: " + syncClassType);
+            // Get all the  element information
+            String elementID = element.getID();
+            String elementClassType = ClassTypes.getShortName(element.getClassType());
+            String elementHumanName = element.getHumanName();
+            String value = String.valueOf(element.getValue());
+
+            // Write into XML file
+            org.dom4j.Element item = root.addElement(elementClassType).addAttribute("id", elementID)
+                                                                      .addAttribute("humanname", elementHumanName)
+                                                                      .addAttribute("value", value);
         }
 
-        // Print the element parent information
-        public void printInfParent(Element element)
+        // Trigger
+        public void writeTrigger2XML(org.dom4j.Element root, Trigger element)
         {
-            BaseElement parent = element.getObjectParent();
-            String parentID = parent.getID();
-            String parentClassType = ClassTypes.getShortName(parent.getClassType());
-            String select = parentClassType + "[@id=" + "'" + parentID + "'" + "]";
-            System.out.println("Parent ID: " + parentID);
-            System.out.println("Parent Class Type: " + parentClassType);
-            System.out.println(select);
+            // Get all the  element information
+            String elementID = element.getID();
+            String elementClassType = ClassTypes.getShortName(element.getClassType());
+            String elementHumanName = element.getHumanName();
+            String elementEventType = ClassTypes.getShortName(Objects.requireNonNull(element.getEvent()).getClassType());
+
+            // Write into XML file
+            org.dom4j.Element item = root.addElement(elementClassType).addAttribute("id", elementID)
+                                                                      .addAttribute("humanname", elementHumanName)
+                                                                      .addAttribute("event", elementEventType);
+
+            /*
+             * For different types of events,
+             * add the unique attributes to the XML statement
+             */
+            if(Objects.equals(elementEventType, "TimeEvent"))
+            {
+                TimeEvent timeEvent = (TimeEvent)element.getEvent();
+                TimeExpression when = timeEvent.getWhen();
+                String time = null;
+                if(when != null)
+                {
+                    LiteralString expr = (LiteralString)when.getExpr();
+                    if(expr != null)
+                    {
+                        time = expr.getValue();
+                    }
+                }
+                item.addAttribute("when", time);
+            }
         }
     }
 }
