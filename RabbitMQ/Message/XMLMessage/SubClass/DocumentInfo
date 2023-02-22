@@ -1,0 +1,43 @@
+package Message.XMLMessage.SubClass;
+
+import Message.BaseMessage;
+import org.dom4j.Document;
+
+import java.io.Serializable;
+import java.text.SimpleDateFormat;
+
+public class DocumentInfo extends BaseMessage implements Serializable
+{
+    private final String docName;
+    private final String modelType;
+
+    // Construct function
+    public DocumentInfo(String docName, String modelType, Document document)
+    {
+        super(document);
+        this.docName = docName;
+        this.modelType = modelType;
+    }
+
+    // Access Function
+    public String getDocName()
+    {
+        return this.docName;
+    }
+
+    public String getModelType()
+    {
+        return this.modelType;
+    }
+
+    public String getTime()
+    {
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        return formatter.format(super.getSendTime());
+    }
+
+    public Document getDocument()
+    {
+        return (Document)super.getContent();
+    }
+}
