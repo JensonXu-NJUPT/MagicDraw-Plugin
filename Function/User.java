@@ -1,4 +1,4 @@
-package myplugin7.Function;
+package plugin.Function;
 
 import java.util.Date;
 import java.text.SimpleDateFormat;
