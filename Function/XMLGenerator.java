@@ -1,4 +1,4 @@
-package myplugin7.Function;
+package plugin.Function;
 
 import com.nomagic.magicdraw.ui.browser.*;
 import com.nomagic.magicdraw.core.Application;
